@@ -120,7 +120,19 @@
       },
       function (results, status) {
         if (status !== google.maps.places.PlacesServiceStatus.OK || !results || !results.length) {
-          onResolved("");
+          // Fallback: autocomplete predictions often work even when findPlaceFromQuery does not.
+          const ac = new google.maps.places.AutocompleteService();
+          ac.getPlacePredictions({ input: placeQuery }, function (preds, acStatus) {
+            if (acStatus !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
+              onResolved("");
+              return;
+            }
+            const id = (preds[0].place_id || "").trim();
+            if (id) {
+              setCachedPlaceId(id);
+            }
+            onResolved(id);
+          });
           return;
         }
         const id = (results[0].place_id || "").trim();
@@ -144,17 +156,18 @@
           return;
         }
 
-        if (allowRetry && canRetryWithQuery(status)) {
-          // If Google says the Place ID is invalid/expired, drop any cached ID and re-resolve.
+        if (allowRetry) {
+          // Any failure: try to re-resolve. Google may also log "Place ID is no longer valid"
+          // while returning status codes that don't map cleanly to NOT_FOUND/INVALID_REQUEST.
           clearCachedPlaceId();
           resolvePlaceId(
             service,
             function (resolved) {
-            if (!resolved) {
-              setStatus("Unable to load live Google reviews at the moment.");
-              return;
-            }
-            fetchDetails(service, resolved, false);
+              if (!resolved) {
+                setStatus("Unable to load live Google reviews at the moment.");
+                return;
+              }
+              fetchDetails(service, resolved, false);
             },
             { skipCache: true }
           );
