@@ -11,9 +11,32 @@
 
   // New Places API uses ids that can change; cache the resolved id in-browser.
   const placeIdCacheKey = "ld_google_place_id_v3";
+  const debug = new URLSearchParams(window.location.search).get("debugReviews") === "1";
 
   function setStatus(message) {
     statusEl.textContent = message;
+  }
+
+  function debugLog(...args) {
+    if (!debug) return;
+    // eslint-disable-next-line no-console
+    console.log("[live-reviews]", ...args);
+  }
+
+  function debugError(...args) {
+    if (!debug) return;
+    // eslint-disable-next-line no-console
+    console.error("[live-reviews]", ...args);
+  }
+
+  function setStatusWithDebug(message, err) {
+    if (!debug) {
+      setStatus(message);
+      return;
+    }
+    const name = err && err.name ? String(err.name) : "Error";
+    const msg = err && err.message ? String(err.message) : String(err || "");
+    setStatus(`${message} (${name}: ${msg})`);
   }
 
   function escapeHtml(text) {
@@ -73,8 +96,8 @@
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
       script.async = true;
       script.defer = true;
-      script.onload = resolve;
-      script.onerror = reject;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load https://maps.googleapis.com/maps/api/js"));
       document.head.appendChild(script);
     });
   }
@@ -184,6 +207,8 @@
     const placeId = await resolvePlaceId(placesLib);
     if (!placeId) throw new Error("Unable to resolve place id");
 
+    debugLog("Resolved place id:", placeId);
+
     const place = new placesLib.Place({ id: placeId });
     await place.fetchFields({
       fields: ["displayName", "rating", "userRatingCount", "reviews", "googleMapsUri"],
@@ -226,7 +251,13 @@
     }
 
     setStatus("Loading live reviews...");
-    await loadMapsJs();
+    try {
+      await loadMapsJs();
+    } catch (e) {
+      debugError("Maps JS load failed", e);
+      setStatusWithDebug("Unable to load Google Maps JavaScript", e);
+      return;
+    }
 
     let placesLib = null;
     try {
@@ -235,17 +266,29 @@
       placesLib = null;
     }
 
+    if (!placesLib) {
+      setStatus("Unable to load live Google reviews at the moment.");
+      if (debug) {
+        setStatus(
+          "Unable to import Google Places library. Check that 'Maps JavaScript API' and 'Places API (New)' are enabled and billing is active."
+        );
+      }
+      return;
+    }
+
     // If Place API fetch fails (often due to cached/invalid ids), clear cache and retry once.
     if (placesLib && placesLib.Place) {
       try {
         await fetchViaNewPlaceApi(placesLib);
         return;
       } catch (e) {
+        debugError("New Place API failed (first try)", e);
         clearCachedPlaceId();
         try {
           await fetchViaNewPlaceApi(placesLib);
           return;
-        } catch {
+        } catch (e2) {
+          debugError("New Place API failed (second try)", e2);
           // fall through
         }
       }
@@ -255,7 +298,8 @@
     try {
       fetchViaLegacyPlacesService();
       return;
-    } catch {
+    } catch (e) {
+      debugError("Legacy PlacesService fallback failed", e);
       // fall through
     }
 
@@ -263,9 +307,9 @@
     setStatus(`Unable to load live Google reviews at the moment.${link}`);
   }
 
-  main().catch(() => {
+  main().catch((e) => {
+    debugError("Unhandled failure in main()", e);
     const link = reviewsShareUrl ? ` You can still read reviews here: ${reviewsShareUrl}` : "";
-    setStatus(`Unable to load live Google reviews at the moment.${link}`);
+    setStatusWithDebug(`Unable to load live Google reviews at the moment.${link}`, e);
   });
 })();
-
