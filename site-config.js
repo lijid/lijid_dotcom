@@ -1,5 +1,5 @@
 window.SITE_CONFIG = {
-  siteVersion: "26.0.1",
+  siteVersion: "26.0.2",
   googleMapsApiKey: "AIzaSyBTdNgqHxukFqW5YC-vBMJyBZGp3HozksI",
   googlePlaceId: "ChIJ9WYin_E39ocRjjv-SfNSlAY",
   // Used when Google rotates/invalidates Place IDs. This resolves a fresh placeId client-side.

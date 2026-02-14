@@ -93,7 +93,8 @@
 
     await new Promise((resolve, reject) => {
       const script = document.createElement("script");
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
+      // Ensure places namespace is available for legacy fallback even if importLibrary fails.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = () => resolve();
@@ -260,20 +261,30 @@
     }
 
     let placesLib = null;
+    let importErr = null;
     try {
       placesLib = await google.maps.importLibrary("places");
-    } catch {
+    } catch (e) {
       placesLib = null;
+      importErr = e;
     }
 
     if (!placesLib) {
-      setStatus("Unable to load live Google reviews at the moment.");
       if (debug) {
-        setStatus(
-          "Unable to import Google Places library. Check that 'Maps JavaScript API' and 'Places API (New)' are enabled and billing is active."
-        );
+        debugError("importLibrary('places') failed", importErr);
       }
-      return;
+      // Try legacy fallback instead of failing hard.
+      try {
+        fetchViaLegacyPlacesService();
+        return;
+      } catch (e) {
+        debugError("Legacy PlacesService fallback failed after importLibrary failure", e);
+        setStatusWithDebug(
+          "Unable to import Google Places library. Check that 'Maps JavaScript API' and 'Places API (New)' are enabled and billing is active.",
+          importErr || e
+        );
+        return;
+      }
     }
 
     // If Place API fetch fails (often due to cached/invalid ids), clear cache and retry once.
