@@ -7,6 +7,7 @@
   const apiKey = String(cfg.googleMapsApiKey || "").trim();
   const placeQuery = String(cfg.googlePlaceQuery || "").trim();
   const reviewsShareUrl = String(cfg.googleReviewsShareUrl || "").trim();
+  const locationBiasCfg = cfg.googlePlaceLocationBias || null;
   const maxReviews = Number(cfg.maxLiveReviews) || 4;
 
   // New Places API uses ids that can change; cache the resolved id in-browser.
@@ -19,6 +20,19 @@
 
   function hasImportLibrary() {
     return Boolean(window.google && google.maps && typeof google.maps.importLibrary === "function");
+  }
+
+  function getLocationBias() {
+    if (!locationBiasCfg) return null;
+    const lat = Number(locationBiasCfg.lat);
+    const lng = Number(locationBiasCfg.lng);
+    const radiusMeters = Number(locationBiasCfg.radiusMeters);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(radiusMeters)) return null;
+    if (!google.maps || typeof google.maps.Circle !== "function") return null;
+    return new google.maps.Circle({
+      center: { lat, lng },
+      radius: Math.max(1000, radiusMeters),
+    });
   }
 
   function setStatus(message) {
@@ -196,11 +210,40 @@
       }
     }
 
+    // Recommended for new customers: AutocompleteSuggestion API.
+    {
+      const AS =
+        (placesLib && placesLib.AutocompleteSuggestion) ||
+        (hasPlacesNamespace() && google.maps.places.AutocompleteSuggestion);
+
+      if (AS && typeof AS.fetchAutocompleteSuggestions === "function") {
+        const bias = getLocationBias();
+        const resp = await AS.fetchAutocompleteSuggestions({
+          input: placeQuery,
+          locationBias: bias || undefined,
+        });
+        const suggestions = (resp && resp.suggestions) || [];
+        const s0 = suggestions[0];
+        // Shape varies; handle common variants.
+        const placeId =
+          (s0 &&
+            (s0.placePrediction && (s0.placePrediction.placeId || s0.placePrediction.place_id))) ||
+          (s0 && (s0.placeId || s0.place_id));
+        const id = String(placeId || "").trim();
+        if (id) {
+          setCachedPlaceId(id);
+          return id;
+        }
+      }
+    }
+
     // Fallback: Autocomplete predictions (legacy).
     if (hasPlacesNamespace() && typeof google.maps.places.AutocompleteService === "function") {
       const ac = new google.maps.places.AutocompleteService();
       const pred = await new Promise((resolve) => {
-        ac.getPlacePredictions({ input: placeQuery }, function (preds, status) {
+        const bias = getLocationBias();
+        const req = bias ? { input: placeQuery, locationBias: bias } : { input: placeQuery };
+        ac.getPlacePredictions(req, function (preds, status) {
           if (status !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
             resolve(null);
             return;
@@ -239,11 +282,32 @@
     const cached = getCachedPlaceId().trim();
     if (cached) return cached;
     if (!placeQuery) return "";
-    if (!hasPlacesNamespace() || typeof google.maps.places.AutocompleteService !== "function") return "";
+    if (!hasPlacesNamespace()) return "";
+
+    // Prefer AutocompleteSuggestion if present.
+    if (google.maps.places.AutocompleteSuggestion && typeof google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions === "function") {
+      const bias = getLocationBias();
+      const resp = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions({
+        input: placeQuery,
+        locationBias: bias || undefined,
+      });
+      const suggestions = (resp && resp.suggestions) || [];
+      const s0 = suggestions[0];
+      const placeId =
+        (s0 && (s0.placePrediction && (s0.placePrediction.placeId || s0.placePrediction.place_id))) ||
+        (s0 && (s0.placeId || s0.place_id));
+      const id = String(placeId || "").trim();
+      if (id) setCachedPlaceId(id);
+      return id;
+    }
+
+    if (typeof google.maps.places.AutocompleteService !== "function") return "";
 
     const ac = new google.maps.places.AutocompleteService();
     const pred = await new Promise((resolve) => {
-      ac.getPlacePredictions({ input: placeQuery }, function (preds, status) {
+      const bias = getLocationBias();
+      const req = bias ? { input: placeQuery, locationBias: bias } : { input: placeQuery };
+      ac.getPlacePredictions(req, function (preds, status) {
         if (status !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
           resolve(null);
           return;
