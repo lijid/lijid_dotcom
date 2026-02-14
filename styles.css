@@ -192,6 +192,12 @@ h2 {
   border-top: 1px solid var(--line);
 }
 
+.site-version {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 @keyframes reveal {
   from {
     opacity: 0;

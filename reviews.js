@@ -1,17 +1,19 @@
 (function () {
   const statusEl = document.getElementById("live-review-status");
   const cardsEl = document.getElementById("live-review-cards");
+  if (!statusEl || !cardsEl) return;
+
   const cfg = window.SITE_CONFIG || {};
-  const apiKey = (cfg.googleMapsApiKey || "").trim();
-  const configuredPlaceId = (cfg.googlePlaceId || "").trim();
-  const placeQuery = (cfg.googlePlaceQuery || "").trim();
+  const apiKey = String(cfg.googleMapsApiKey || "").trim();
+  const placeQuery = String(cfg.googlePlaceQuery || "").trim();
+  const reviewsShareUrl = String(cfg.googleReviewsShareUrl || "").trim();
   const maxReviews = Number(cfg.maxLiveReviews) || 4;
-  const placeIdCacheKey = "ld_google_place_id_v1";
+
+  // New Places API uses ids that can change; cache the resolved id in-browser.
+  const placeIdCacheKey = "ld_google_place_id_v3";
 
   function setStatus(message) {
-    if (statusEl) {
-      statusEl.textContent = message;
-    }
+    statusEl.textContent = message;
   }
 
   function escapeHtml(text) {
@@ -24,52 +26,18 @@
   }
 
   function renderStars(rating) {
-    const full = "★".repeat(Math.max(0, Math.min(5, rating || 0)));
-    const empty = "☆".repeat(Math.max(0, 5 - (rating || 0)));
+    const r = Math.max(0, Math.min(5, Number(rating) || 0));
+    const full = "★".repeat(r);
+    const empty = "☆".repeat(5 - r);
     return `${full}${empty}`;
   }
 
-  function renderReviews(place) {
-    const all = Array.isArray(place.reviews) ? place.reviews : [];
-    const sorted = all
-      .slice()
-      .sort((a, b) => (b.time || 0) - (a.time || 0))
-      .slice(0, maxReviews);
-
-    if (!sorted.length) {
-      setStatus("No live reviews available right now.");
-      return;
-    }
-
-    cardsEl.innerHTML = sorted
-      .map((review) => {
-        const author = escapeHtml(review.author_name || "Google User");
-        const text = escapeHtml(review.text || "");
-        const relative = escapeHtml(review.relative_time_description || "");
-        const stars = renderStars(review.rating);
-
-        return `
-          <article class="card">
-            <p class="stars" aria-label="${review.rating || 0} out of 5 stars">${stars}</p>
-            <blockquote>"${text}"</blockquote>
-            <p class="author">- ${author}</p>
-            <p class="meta">${relative}</p>
-          </article>
-        `;
-      })
-      .join("");
-
-    const total = Number(place.user_ratings_total || 0);
-    const rating = Number(place.rating || 0).toFixed(1);
-    setStatus(`Google rating: ${rating}/5 from ${total} reviews.`);
-  }
-
-  function canRetryWithQuery(status) {
-    // These usually indicate the Place ID is wrong/expired.
-    return (
-      status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST ||
-      status === google.maps.places.PlacesServiceStatus.NOT_FOUND
-    );
+  function getTextValue(maybeLocalizedText) {
+    if (!maybeLocalizedText) return "";
+    if (typeof maybeLocalizedText === "string") return maybeLocalizedText;
+    // Places (new) returns { text, languageCode } for some fields.
+    if (typeof maybeLocalizedText.text === "string") return maybeLocalizedText.text;
+    return "";
   }
 
   function getCachedPlaceId() {
@@ -80,151 +48,224 @@
     }
   }
 
-  function clearCachedPlaceId() {
-    try {
-      if (window.localStorage) {
-        window.localStorage.removeItem(placeIdCacheKey);
-      }
-    } catch {
-      // ignore cache issues
-    }
-  }
-
   function setCachedPlaceId(id) {
     try {
-      if (window.localStorage) {
-        window.localStorage.setItem(placeIdCacheKey, id);
-      }
+      if (window.localStorage) window.localStorage.setItem(placeIdCacheKey, id);
     } catch {
-      // ignore cache issues
+      // ignore
     }
   }
 
-  function resolvePlaceId(service, onResolved, opts) {
-    const skipCache = Boolean(opts && opts.skipCache);
-    const cached = skipCache ? "" : getCachedPlaceId().trim();
-    if (cached) {
-      onResolved(cached);
+  function clearCachedPlaceId() {
+    try {
+      if (window.localStorage) window.localStorage.removeItem(placeIdCacheKey);
+    } catch {
+      // ignore
+    }
+  }
+
+  async function loadMapsJs() {
+    if (!apiKey) throw new Error("Missing Google Maps API key");
+    if (window.google && google.maps && typeof google.maps.importLibrary === "function") return;
+
+    await new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async`;
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  function tryParseTimeSeconds(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function renderReviewCards(reviews, placeMeta) {
+    const sorted = (Array.isArray(reviews) ? reviews : [])
+      .slice()
+      .sort((a, b) => {
+        const ta = tryParseTimeSeconds(a.time) || Date.parse(a.publishTime || "") / 1000 || 0;
+        const tb = tryParseTimeSeconds(b.time) || Date.parse(b.publishTime || "") / 1000 || 0;
+        return tb - ta;
+      })
+      .slice(0, maxReviews);
+
+    if (!sorted.length) {
+      setStatus("No live reviews available right now.");
       return;
     }
 
-    if (!placeQuery) {
-      onResolved("");
-      return;
-    }
+    cardsEl.innerHTML = sorted
+      .map((review) => {
+        const rating = Number(review.rating) || 0;
+        const stars = renderStars(rating);
 
-    service.findPlaceFromQuery(
-      {
-        query: placeQuery,
-        fields: ["place_id", "name", "formatted_address"],
-      },
-      function (results, status) {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !results || !results.length) {
-          // Fallback: autocomplete predictions often work even when findPlaceFromQuery does not.
-          const ac = new google.maps.places.AutocompleteService();
-          ac.getPlacePredictions({ input: placeQuery }, function (preds, acStatus) {
-            if (acStatus !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
-              onResolved("");
-              return;
-            }
-            const id = (preds[0].place_id || "").trim();
-            if (id) {
-              setCachedPlaceId(id);
-            }
-            onResolved(id);
-          });
-          return;
-        }
-        const id = (results[0].place_id || "").trim();
-        if (id) {
-          setCachedPlaceId(id);
-        }
-        onResolved(id);
-      }
-    );
+        // Legacy PlacesService fields:
+        const authorLegacy = review.author_name;
+        const textLegacy = review.text;
+        const relLegacy = review.relative_time_description;
+
+        // New Place fields:
+        const authorNew = review.authorAttribution && review.authorAttribution.displayName;
+        const textNew = getTextValue(review.text);
+        const relNew = review.relativePublishTimeDescription;
+
+        const author = escapeHtml(authorNew || authorLegacy || "Google User");
+        const text = escapeHtml(textNew || textLegacy || "");
+        const relative = escapeHtml(relNew || relLegacy || "");
+
+        return `
+          <article class="card">
+            <p class="stars" aria-label="${rating} out of 5 stars">${stars}</p>
+            <blockquote>"${text}"</blockquote>
+            <p class="author">- ${author}</p>
+            <p class="meta">${relative}</p>
+          </article>
+        `;
+      })
+      .join("");
+
+    const rating = Number(placeMeta.rating || 0);
+    const count = Number(placeMeta.userRatingCount || placeMeta.user_ratings_total || 0);
+    const ratingText = rating ? `${rating.toFixed(1)}/5` : "N/A";
+    const countText = count ? `${count}` : "N/A";
+    setStatus(`Google rating: ${ratingText} from ${countText} reviews.`);
   }
 
-  function fetchDetails(service, placeId, allowRetry) {
-    service.getDetails(
-      {
-        placeId,
-        fields: ["name", "rating", "user_ratings_total", "reviews", "url"],
-      },
-      function (place, status) {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          renderReviews(place);
-          return;
-        }
-
-        if (allowRetry) {
-          // Any failure: try to re-resolve. Google may also log "Place ID is no longer valid"
-          // while returning status codes that don't map cleanly to NOT_FOUND/INVALID_REQUEST.
-          clearCachedPlaceId();
-          resolvePlaceId(
-            service,
-            function (resolved) {
-              if (!resolved) {
-                setStatus("Unable to load live Google reviews at the moment.");
-                return;
-              }
-              fetchDetails(service, resolved, false);
-            },
-            { skipCache: true }
-          );
-          return;
-        }
-
-        setStatus("Unable to load live Google reviews at the moment.");
-      }
-    );
-  }
-
-  function initPlaces() {
-    const service = new google.maps.places.PlacesService(document.createElement("div"));
-
+  async function resolvePlaceId(placesLib) {
     const cached = getCachedPlaceId().trim();
-    const initialId = cached || configuredPlaceId;
-    if (!initialId) {
-      resolvePlaceId(service, function (resolved) {
-        if (!resolved) {
+    if (cached) return cached;
+
+    if (!placeQuery) return "";
+
+    // Preferred: new Places API search.
+    if (placesLib.Place && typeof placesLib.Place.searchByText === "function") {
+      const resp = await placesLib.Place.searchByText({
+        textQuery: placeQuery,
+        fields: ["id", "displayName", "formattedAddress"],
+      });
+      const place = resp && resp.places && resp.places[0];
+      const id = place && String(place.id || "").trim();
+      if (id) {
+        setCachedPlaceId(id);
+        return id;
+      }
+    }
+
+    // Fallback: Autocomplete predictions (legacy).
+    if (google.maps.places && typeof google.maps.places.AutocompleteService === "function") {
+      const ac = new google.maps.places.AutocompleteService();
+      const pred = await new Promise((resolve) => {
+        ac.getPlacePredictions({ input: placeQuery }, function (preds, status) {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
+            resolve(null);
+            return;
+          }
+          resolve(preds[0]);
+        });
+      });
+      const id = pred && String(pred.place_id || "").trim();
+      if (id) {
+        setCachedPlaceId(id);
+        return id;
+      }
+    }
+
+    return "";
+  }
+
+  async function fetchViaNewPlaceApi(placesLib) {
+    if (!placesLib.Place) throw new Error("Places library missing Place");
+
+    const placeId = await resolvePlaceId(placesLib);
+    if (!placeId) throw new Error("Unable to resolve place id");
+
+    const place = new placesLib.Place({ id: placeId });
+    await place.fetchFields({
+      fields: ["displayName", "rating", "userRatingCount", "reviews", "googleMapsUri"],
+    });
+
+    const reviews = place.reviews || [];
+    renderReviewCards(reviews, place);
+  }
+
+  function fetchViaLegacyPlacesService() {
+    // Best-effort fallback for environments that don't support the new Place API.
+    const service = new google.maps.places.PlacesService(document.createElement("div"));
+    const placeId = String(cfg.googlePlaceId || "").trim();
+    if (!placeId) {
+      setStatus("Unable to load live Google reviews at the moment.");
+      return;
+    }
+
+    service.getDetails(
+      { placeId, fields: ["name", "rating", "user_ratings_total", "reviews", "url"] },
+      function (place, status) {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
           setStatus("Unable to load live Google reviews at the moment.");
           return;
         }
-        fetchDetails(service, resolved, false);
-      });
+        renderReviewCards(place.reviews || [], place);
+      }
+    );
+  }
+
+  async function main() {
+    // Manual escape hatch: add ?clearPlaceCache=1 once.
+    if (new URLSearchParams(window.location.search).get("clearPlaceCache") === "1") {
+      clearCachedPlaceId();
+    }
+
+    if (!apiKey) {
+      setStatus("Live reviews are not configured yet. Add the Google Maps API key in site-config.js.");
       return;
     }
 
-    fetchDetails(service, initialId, true);
+    setStatus("Loading live reviews...");
+    await loadMapsJs();
+
+    let placesLib = null;
+    try {
+      placesLib = await google.maps.importLibrary("places");
+    } catch {
+      placesLib = null;
+    }
+
+    // If Place API fetch fails (often due to cached/invalid ids), clear cache and retry once.
+    if (placesLib && placesLib.Place) {
+      try {
+        await fetchViaNewPlaceApi(placesLib);
+        return;
+      } catch (e) {
+        clearCachedPlaceId();
+        try {
+          await fetchViaNewPlaceApi(placesLib);
+          return;
+        } catch {
+          // fall through
+        }
+      }
+    }
+
+    // Legacy fallback.
+    try {
+      fetchViaLegacyPlacesService();
+      return;
+    } catch {
+      // fall through
+    }
+
+    const link = reviewsShareUrl ? ` You can still read reviews here: ${reviewsShareUrl}` : "";
+    setStatus(`Unable to load live Google reviews at the moment.${link}`);
   }
 
-  function loadGoogleMapsScript() {
-    const callbackName = "initLijiGoogleReviews";
-    window[callbackName] = initPlaces;
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&loading=async&libraries=places&callback=${callbackName}`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = function () {
-      setStatus("Unable to load Google Maps script. Check API key and restrictions.");
-    };
-    document.head.appendChild(script);
-  }
-
-  if (!cardsEl || !statusEl) {
-    return;
-  }
-
-  if (!apiKey) {
-    setStatus("Live reviews are not configured yet. Add the Google Maps API key in site-config.js.");
-    return;
-  }
-
-  // Manual escape hatch for debugging: add ?clearPlaceCache=1 to the URL.
-  if (new URLSearchParams(window.location.search).get("clearPlaceCache") === "1") {
-    clearCachedPlaceId();
-  }
-
-  loadGoogleMapsScript();
+  main().catch(() => {
+    const link = reviewsShareUrl ? ` You can still read reviews here: ${reviewsShareUrl}` : "";
+    setStatus(`Unable to load live Google reviews at the moment.${link}`);
+  });
 })();
+
