@@ -80,6 +80,16 @@
     }
   }
 
+  function clearCachedPlaceId() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.removeItem(placeIdCacheKey);
+      }
+    } catch {
+      // ignore cache issues
+    }
+  }
+
   function setCachedPlaceId(id) {
     try {
       if (window.localStorage) {
@@ -90,8 +100,9 @@
     }
   }
 
-  function resolvePlaceId(service, onResolved) {
-    const cached = getCachedPlaceId().trim();
+  function resolvePlaceId(service, onResolved, opts) {
+    const skipCache = Boolean(opts && opts.skipCache);
+    const cached = skipCache ? "" : getCachedPlaceId().trim();
     if (cached) {
       onResolved(cached);
       return;
@@ -134,13 +145,19 @@
         }
 
         if (allowRetry && canRetryWithQuery(status)) {
-          resolvePlaceId(service, function (resolved) {
+          // If Google says the Place ID is invalid/expired, drop any cached ID and re-resolve.
+          clearCachedPlaceId();
+          resolvePlaceId(
+            service,
+            function (resolved) {
             if (!resolved) {
               setStatus("Unable to load live Google reviews at the moment.");
               return;
             }
             fetchDetails(service, resolved, false);
-          });
+            },
+            { skipCache: true }
+          );
           return;
         }
 
@@ -189,6 +206,11 @@
   if (!apiKey) {
     setStatus("Live reviews are not configured yet. Add the Google Maps API key in site-config.js.");
     return;
+  }
+
+  // Manual escape hatch for debugging: add ?clearPlaceCache=1 to the URL.
+  if (new URLSearchParams(window.location.search).get("clearPlaceCache") === "1") {
+    clearCachedPlaceId();
   }
 
   loadGoogleMapsScript();
