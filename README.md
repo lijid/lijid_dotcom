@@ -10,7 +10,8 @@ This project contains a redesigned one-page website that preserves:
 - `index.html`
 - `styles.css`
 - `site-config.js`
-- `reviews.js`
+- `widget-loader.js`
+- `reviews-embed.html`
 
 ## Keep Your Current Domain
 
@@ -27,28 +28,20 @@ After deploying these files to your hosting provider (Netlify, Vercel, Cloudflar
    - `www.lijideepak.com`
 5. Enable HTTPS and redirect one version to the canonical one.
 
-## Live Google Reviews Setup
+## Google Reviews Widget Setup
 
-The site now has a live reviews section that pulls the latest Google reviews automatically.
+The site now expects a third-party reviews widget embed snippet.
 
-1. Sign in with `er.liji@gmail.com` at Google Cloud Console.
-2. Create/select a project.
-3. Enable APIs:
-   - `Places API`
-   - `Maps JavaScript API`
-4. Create an API key and restrict it:
-   - Application restriction: HTTP referrers (`www.lijideepak.com/*`, `lijideepak.com/*`)
-   - API restriction: limit to Places API + Maps JavaScript API
-5. Open `site-config.js` and set:
-   - `googleMapsApiKey: "YOUR_KEY_HERE"`
-6. Keep this place id as-is unless your business listing changes:
-   - `googlePlaceId: "ChIJ9WYin_E39ocRjjv-SfNSlAY"`
+1. Choose a provider (examples: Elfsight, SociableKIT, EmbedSocial).
+2. Connect your Google Business Profile inside that provider.
+3. Copy the provider's embed snippet.
+4. Paste it into `reviews-embed.html`.
 
 ## Reviews Retention Notes
 
 - Google reviews themselves stay on your Google Business Profile (not on your website host), so they are retained.
-- This redesign includes preserved testimonial text and a live reviews feed.
-- If the live feed fails, static testimonials still remain visible.
+- This redesign includes preserved testimonial text and a widget-based live reviews feed.
+- If the widget fails, static testimonials still remain visible.
 
 ## Picture Retention
 
