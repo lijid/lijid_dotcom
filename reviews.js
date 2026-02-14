@@ -13,6 +13,14 @@
   const placeIdCacheKey = "ld_google_place_id_v3";
   const debug = new URLSearchParams(window.location.search).get("debugReviews") === "1";
 
+  function hasPlacesNamespace() {
+    return Boolean(window.google && google.maps && google.maps.places);
+  }
+
+  function hasImportLibrary() {
+    return Boolean(window.google && google.maps && typeof google.maps.importLibrary === "function");
+  }
+
   function setStatus(message) {
     statusEl.textContent = message;
   }
@@ -89,15 +97,23 @@
 
   async function loadMapsJs() {
     if (!apiKey) throw new Error("Missing Google Maps API key");
-    if (window.google && google.maps && typeof google.maps.importLibrary === "function") return;
+    if (hasPlacesNamespace() || hasImportLibrary()) return;
 
     await new Promise((resolve, reject) => {
+      const cb = "initLijiMapsPlaces";
+      window[cb] = () => {
+        try {
+          delete window[cb];
+        } catch {
+          // ignore
+        }
+        resolve();
+      };
       const script = document.createElement("script");
-      // Ensure places namespace is available for legacy fallback even if importLibrary fails.
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&libraries=places`;
+      // Use callback to ensure Google finished initializing the places namespace.
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&v=weekly&loading=async&libraries=places&callback=${cb}`;
       script.async = true;
       script.defer = true;
-      script.onload = () => resolve();
       script.onerror = () => reject(new Error("Failed to load https://maps.googleapis.com/maps/api/js"));
       document.head.appendChild(script);
     });
@@ -181,7 +197,7 @@
     }
 
     // Fallback: Autocomplete predictions (legacy).
-    if (google.maps.places && typeof google.maps.places.AutocompleteService === "function") {
+    if (hasPlacesNamespace() && typeof google.maps.places.AutocompleteService === "function") {
       const ac = new google.maps.places.AutocompleteService();
       const pred = await new Promise((resolve) => {
         ac.getPlacePredictions({ input: placeQuery }, function (preds, status) {
@@ -219,25 +235,54 @@
     renderReviewCards(reviews, place);
   }
 
-  function fetchViaLegacyPlacesService() {
-    // Best-effort fallback for environments that don't support the new Place API.
-    const service = new google.maps.places.PlacesService(document.createElement("div"));
-    const placeId = String(cfg.googlePlaceId || "").trim();
-    if (!placeId) {
-      setStatus("Unable to load live Google reviews at the moment.");
-      return;
-    }
+  async function resolvePlaceIdLegacy() {
+    const cached = getCachedPlaceId().trim();
+    if (cached) return cached;
+    if (!placeQuery) return "";
+    if (!hasPlacesNamespace() || typeof google.maps.places.AutocompleteService !== "function") return "";
 
-    service.getDetails(
-      { placeId, fields: ["name", "rating", "user_ratings_total", "reviews", "url"] },
-      function (place, status) {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
-          setStatus("Unable to load live Google reviews at the moment.");
+    const ac = new google.maps.places.AutocompleteService();
+    const pred = await new Promise((resolve) => {
+      ac.getPlacePredictions({ input: placeQuery }, function (preds, status) {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !preds || !preds.length) {
+          resolve(null);
           return;
         }
-        renderReviewCards(place.reviews || [], place);
-      }
-    );
+        resolve(preds[0]);
+      });
+    });
+    const id = pred && String(pred.place_id || "").trim();
+    if (id) setCachedPlaceId(id);
+    return id;
+  }
+
+  async function fetchViaLegacyPlacesService() {
+    // Best-effort fallback for environments that don't support the new Place API.
+    if (!hasPlacesNamespace() || typeof google.maps.places.PlacesService !== "function") {
+      throw new Error("google.maps.places.PlacesService is unavailable");
+    }
+
+    const placeId = await resolvePlaceIdLegacy();
+    if (!placeId) throw new Error("Unable to resolve place id (legacy)");
+
+    debugLog("Resolved place id (legacy):", placeId);
+
+    const service = new google.maps.places.PlacesService(document.createElement("div"));
+    await new Promise((resolve, reject) => {
+      service.getDetails(
+        { placeId, fields: ["name", "rating", "user_ratings_total", "reviews", "url"] },
+        function (place, status) {
+          if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
+            // If the cached id is invalid, clear and let caller retry.
+            clearCachedPlaceId();
+            reject(new Error(`PlacesService.getDetails failed: ${String(status)}`));
+            return;
+          }
+          renderReviewCards(place.reviews || [], place);
+          resolve();
+        }
+      );
+    });
   }
 
   async function main() {
@@ -262,11 +307,13 @@
 
     let placesLib = null;
     let importErr = null;
-    try {
-      placesLib = await google.maps.importLibrary("places");
-    } catch (e) {
-      placesLib = null;
-      importErr = e;
+    if (hasImportLibrary()) {
+      try {
+        placesLib = await google.maps.importLibrary("places");
+      } catch (e) {
+        placesLib = null;
+        importErr = e;
+      }
     }
 
     if (!placesLib) {
@@ -275,7 +322,7 @@
       }
       // Try legacy fallback instead of failing hard.
       try {
-        fetchViaLegacyPlacesService();
+        await fetchViaLegacyPlacesService();
         return;
       } catch (e) {
         debugError("Legacy PlacesService fallback failed after importLibrary failure", e);
@@ -307,7 +354,7 @@
 
     // Legacy fallback.
     try {
-      fetchViaLegacyPlacesService();
+      await fetchViaLegacyPlacesService();
       return;
     } catch (e) {
       debugError("Legacy PlacesService fallback failed", e);
