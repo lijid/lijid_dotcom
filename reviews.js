@@ -3,8 +3,10 @@
   const cardsEl = document.getElementById("live-review-cards");
   const cfg = window.SITE_CONFIG || {};
   const apiKey = (cfg.googleMapsApiKey || "").trim();
-  const placeId = (cfg.googlePlaceId || "").trim();
+  const configuredPlaceId = (cfg.googlePlaceId || "").trim();
+  const placeQuery = (cfg.googlePlaceQuery || "").trim();
   const maxReviews = Number(cfg.maxLiveReviews) || 4;
+  const placeIdCacheKey = "ld_google_place_id_v1";
 
   function setStatus(message) {
     if (statusEl) {
@@ -62,21 +64,108 @@
     setStatus(`Google rating: ${rating}/5 from ${total} reviews.`);
   }
 
-  function initPlaces() {
-    const service = new google.maps.places.PlacesService(document.createElement("div"));
+  function canRetryWithQuery(status) {
+    // These usually indicate the Place ID is wrong/expired.
+    return (
+      status === google.maps.places.PlacesServiceStatus.INVALID_REQUEST ||
+      status === google.maps.places.PlacesServiceStatus.NOT_FOUND
+    );
+  }
+
+  function getCachedPlaceId() {
+    try {
+      return (window.localStorage && window.localStorage.getItem(placeIdCacheKey)) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function setCachedPlaceId(id) {
+    try {
+      if (window.localStorage) {
+        window.localStorage.setItem(placeIdCacheKey, id);
+      }
+    } catch {
+      // ignore cache issues
+    }
+  }
+
+  function resolvePlaceId(service, onResolved) {
+    const cached = getCachedPlaceId().trim();
+    if (cached) {
+      onResolved(cached);
+      return;
+    }
+
+    if (!placeQuery) {
+      onResolved("");
+      return;
+    }
+
+    service.findPlaceFromQuery(
+      {
+        query: placeQuery,
+        fields: ["place_id", "name", "formatted_address"],
+      },
+      function (results, status) {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !results || !results.length) {
+          onResolved("");
+          return;
+        }
+        const id = (results[0].place_id || "").trim();
+        if (id) {
+          setCachedPlaceId(id);
+        }
+        onResolved(id);
+      }
+    );
+  }
+
+  function fetchDetails(service, placeId, allowRetry) {
     service.getDetails(
       {
         placeId,
         fields: ["name", "rating", "user_ratings_total", "reviews", "url"],
       },
       function (place, status) {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          renderReviews(place);
+          return;
+        }
+
+        if (allowRetry && canRetryWithQuery(status)) {
+          resolvePlaceId(service, function (resolved) {
+            if (!resolved) {
+              setStatus("Unable to load live Google reviews at the moment.");
+              return;
+            }
+            fetchDetails(service, resolved, false);
+          });
+          return;
+        }
+
+        setStatus("Unable to load live Google reviews at the moment.");
+      }
+    );
+  }
+
+  function initPlaces() {
+    const service = new google.maps.places.PlacesService(document.createElement("div"));
+
+    const cached = getCachedPlaceId().trim();
+    const initialId = cached || configuredPlaceId;
+    if (!initialId) {
+      resolvePlaceId(service, function (resolved) {
+        if (!resolved) {
           setStatus("Unable to load live Google reviews at the moment.");
           return;
         }
-        renderReviews(place);
-      }
-    );
+        fetchDetails(service, resolved, false);
+      });
+      return;
+    }
+
+    fetchDetails(service, initialId, true);
   }
 
   function loadGoogleMapsScript() {
@@ -97,7 +186,7 @@
     return;
   }
 
-  if (!apiKey || !placeId) {
+  if (!apiKey) {
     setStatus("Live reviews are not configured yet. Add the Google Maps API key in site-config.js.");
     return;
   }
