@@ -69,6 +69,31 @@ a {
   animation: reveal 700ms ease;
 }
 
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.hero-photo {
+  margin: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hero-photo img {
+  width: min(280px, 45vw);
+  height: min(280px, 45vw);
+  max-width: 280px;
+  max-height: 280px;
+  object-fit: cover;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .eyebrow {
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -109,6 +134,8 @@ h2 {
   padding: 0.75rem 1.2rem;
   text-decoration: none;
   font-weight: 700;
+  border: none;
+  cursor: pointer;
 }
 
 .btn-primary {
@@ -214,6 +241,14 @@ h2 {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .hero-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-photo {
+    justify-content: flex-start;
+  }
 }
 
 .review-status {
@@ -233,4 +268,83 @@ h2 {
   margin: 0.45rem 0 0;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 50;
+}
+
+.modal.is-open {
+  display: block;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.modal-panel {
+  position: relative;
+  max-width: 720px;
+  margin: 8vh auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.35);
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lead-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 700;
+  color: #2b3242;
+}
+
+.lead-form input {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.8rem;
+  font: inherit;
+  background: #fff;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 0.9rem;
+}
+
+.honeypot {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.form-status {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-weight: 600;
 }

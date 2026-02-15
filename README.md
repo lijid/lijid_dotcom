@@ -10,8 +10,9 @@ This project contains a redesigned one-page website that preserves:
 - `index.html`
 - `styles.css`
 - `site-config.js`
-- `widget-loader.js`
-- `reviews-embed.html`
+- `lead-form.js`
+- `worker.js`
+ - `testimonials.js`
 
 ## Keep Your Current Domain
 
@@ -30,12 +31,23 @@ After deploying these files to your hosting provider (Netlify, Vercel, Cloudflar
 
 ## Google Reviews Widget Setup
 
-The site now expects a third-party reviews widget embed snippet.
+The site uses an Elfsight widget embedded directly in `index.html`.
 
-1. Choose a provider (examples: Elfsight, SociableKIT, EmbedSocial).
-2. Connect your Google Business Profile inside that provider.
-3. Copy the provider's embed snippet.
-4. Paste it into `reviews-embed.html`.
+If you ever need to change the widget:
+- Update the `elfsight-app-...` div class in `index.html`
+- Keep the Elfsight loader in `<head>` (`https://elfsightcdn.com/platform.js`)
+
+## Lead Form (Email) Setup
+
+The “Get In Touch” button opens a form. Submissions POST to `POST /api/lead` which is handled by the Cloudflare Worker in `worker.js`.
+
+In your Cloudflare Worker/Pages settings, set environment variables:
+- `LEAD_TO_EMAIL`: where you want leads delivered (example: `er.liji@gmail.com`)
+- `LEAD_FROM_EMAIL`: the sender address used by MailChannels (recommended: `no-reply@lijideepak.com`)
+
+Notes:
+- This uses MailChannels (`https://api.mailchannels.net/tx/v1/send`) from inside the Worker.
+- Keep `LEAD_FROM_EMAIL` as a domain you control to reduce spam filtering.
 
 ## Reviews Retention Notes
 

@@ -17,6 +17,8 @@
     <meta name="site-version" content="" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
+    <!-- Elfsight widget loader: keep in HTML so it initializes reliably -->
+    <script src="https://elfsightcdn.com/platform.js" async></script>
   </head>
   <body>
     <header class="hero">
@@ -31,15 +33,27 @@
         </div>
       </nav>
       <div class="hero-content" id="top">
-        <p class="eyebrow">Licensed Realtor, Minnesota</p>
-        <h1>Buy and Sell Homes with Liji Deepak</h1>
-        <p>
-          Real estate guidance for Lakeville, Apple Valley, and nearby
-          communities with local expertise and end-to-end support.
-        </p>
-        <div class="hero-actions">
-          <a class="btn btn-primary" href="tel:+16128003202">Call (612) 800-3202</a>
-          <a class="btn btn-secondary" href="#contact">Contact</a>
+        <div class="hero-grid">
+          <div>
+            <p class="eyebrow">Licensed Realtor, Minnesota</p>
+            <h1>Buy and Sell Homes with Liji Deepak</h1>
+            <p>
+              Real estate guidance for Lakeville, Apple Valley, and nearby
+              communities with local expertise and end-to-end support.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="tel:+16128003202">Call (612) 800-3202</a>
+              <button class="btn btn-secondary" id="open-lead-form" type="button">Get In Touch</button>
+            </div>
+          </div>
+          <figure class="hero-photo">
+            <img
+              src="images/liji.jpg"
+              alt="Liji Deepak"
+              loading="lazy"
+              onerror="this.onerror=null;this.src='images/liji-placeholder.svg';"
+            />
+          </figure>
         </div>
       </div>
     </header>
@@ -50,15 +64,14 @@
         <p class="section-intro">
           Live feed powered by a reviews widget.
         </p>
-        <p id="reviews-widget-status" class="review-status">Loading reviews...</p>
-        <div id="reviews-widget-mount"></div>
+        <div class="elfsight-app-5f2b5e22-dd1b-4381-8141-9732b4baf61c"></div>
       </section>
 
       <section class="section" id="testimonials">
         <h2>Client Testimonials</h2>
         <p class="section-intro">Preserved review comments from your current profile.</p>
-        <div class="cards">
-          <article class="card">
+        <div class="cards" id="testimonial-cards">
+          <article class="card testimonial" data-date="2024-01-01">
             <blockquote>
               "Liji did an outstanding job in helping us purchase our new home.
               Liji was responsive to our questions, met with us at our
@@ -68,8 +81,9 @@
               well!!"
             </blockquote>
             <p class="author">- Manoj K</p>
+            <p class="meta"><time datetime="2024-01-01">Jan 2024</time></p>
           </article>
-          <article class="card">
+          <article class="card testimonial" data-date="2024-02-01">
             <blockquote>
               "Liji was very professional, friendly and personal! As a first
               time home buyer we didn’t know where to start. Liji has explained
@@ -79,8 +93,9 @@
               resolved. We would highly recommend her."
             </blockquote>
             <p class="author">- Radha P</p>
+            <p class="meta"><time datetime="2024-02-01">Feb 2024</time></p>
           </article>
-          <article class="card">
+          <article class="card testimonial" data-date="2024-03-01">
             <blockquote>
               "We are glad we met Liji in our journey to buy our first house.
               Liji was friendly, reachable and professional the whole time. She
@@ -90,6 +105,7 @@
               connect with Liji."
             </blockquote>
             <p class="author">- Jitender P</p>
+            <p class="meta"><time datetime="2024-03-01">Mar 2024</time></p>
           </article>
         </div>
         <p>
@@ -163,8 +179,50 @@
       </section>
     </main>
 
+    <div class="modal" id="lead-modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close="1"></div>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="lead-title">
+        <button class="modal-close" type="button" aria-label="Close" data-close="1">×</button>
+        <h2 id="lead-title">Request a Call Back</h2>
+        <p class="section-intro">Share your details and I’ll reach out soon.</p>
+
+        <form id="lead-form" class="lead-form">
+          <div class="field-row">
+            <label>
+              First name
+              <input name="firstName" autocomplete="given-name" required />
+            </label>
+            <label>
+              Last name (optional)
+              <input name="lastName" autocomplete="family-name" />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label>
+              Phone (or email)
+              <input name="phone" autocomplete="tel" inputmode="tel" />
+            </label>
+            <label>
+              Email (or phone)
+              <input name="email" autocomplete="email" inputmode="email" />
+            </label>
+          </div>
+
+          <label class="honeypot">
+            Company
+            <input name="company" tabindex="-1" autocomplete="off" />
+          </label>
+
+          <button class="btn btn-primary" type="submit" id="lead-submit">Send</button>
+          <p class="form-status" id="lead-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
     <script src="site-config.js"></script>
     <script src="app.js"></script>
-    <script src="widget-loader.js"></script>
+    <script src="testimonials.js"></script>
+    <script src="lead-form.js"></script>
   </body>
 </html>
