@@ -24,6 +24,7 @@
         <a class="brand" href="#top">Liji Deepak</a>
         <div class="nav-links">
           <a href="#live-reviews">Live Reviews</a>
+          <a href="#testimonials">Testimonials</a>
           <a href="#about">About</a>
           <a href="#gallery">Gallery</a>
           <a href="#contact">Contact</a>
@@ -61,27 +62,64 @@
         <p class="section-intro">
           Live feed powered by a reviews widget.
         </p>
-        <div class="reviews-shell is-collapsed" id="reviews-shell">
-          <div class="reviews-shell-inner">
         <div
           class="taggbox"
           style="width: 100%; overflow: auto"
           data-widget-id="317004"
           data-website="1"
         ></div>
-          </div>
-          <div class="reviews-fade" aria-hidden="true"></div>
+      </section>
+
+      <section class="section" id="testimonials">
+        <h2>Client Testimonials</h2>
+        <p class="section-intro">Preserved review comments from your current profile.</p>
+        <div class="cards" id="testimonial-cards">
+          <article class="card testimonial" data-date="2024-01-01">
+            <blockquote>
+              "Liji did an outstanding job in helping us purchase our new home.
+              Liji was responsive to our questions, met with us at our
+              convenience, and advocated for us at every step of the process.
+              She was very responsive and helpful during the whole process. She
+              works hard! She came recommended and I would highly recommend as
+              well!!"
+            </blockquote>
+            <p class="author">- Manoj K</p>
+            <p class="meta"><time datetime="2024-01-01">Jan 2024</time></p>
+          </article>
+          <article class="card testimonial" data-date="2024-02-01">
+            <blockquote>
+              "Liji was very professional, friendly and personal! As a first
+              time home buyer we didn’t know where to start. Liji has explained
+              everything in a way easy to understand, from design meeting to
+              working with mortgage banker. She helped us every step of the way.
+              Even after closing, she follows up and makes sure issues are
+              resolved. We would highly recommend her."
+            </blockquote>
+            <p class="author">- Radha P</p>
+            <p class="meta"><time datetime="2024-02-01">Feb 2024</time></p>
+          </article>
+          <article class="card testimonial" data-date="2024-03-01">
+            <blockquote>
+              "We are glad we met Liji in our journey to buy our first house.
+              Liji was friendly, reachable and professional the whole time. She
+              made sure we understood the details and helped whenever needed.
+              She made the whole process easy for us and we are very thankful.
+              I highly recommend everyone who is looking to buy a house to
+              connect with Liji."
+            </blockquote>
+            <p class="author">- Jitender P</p>
+            <p class="meta"><time datetime="2024-03-01">Mar 2024</time></p>
+          </article>
         </div>
-        <div class="reviews-actions">
-          <button class="btn btn-secondary" type="button" id="toggle-reviews">Show more reviews</button>
+        <p>
           <a
-            class="btn btn-primary"
-            href="https://search.google.com/local/reviews?cid=474095065652673422"
+            class="review-link"
             target="_blank"
             rel="noopener noreferrer"
-            >Open on Google</a
+            href="https://search.google.com/local/reviews?cid=474095065652673422"
+            >Read more Google reviews</a
           >
-        </div>
+        </p>
       </section>
 
       <section class="section split" id="about">
@@ -187,8 +225,8 @@
 
     <script src="site-config.js"></script>
     <script src="app.js"></script>
+    <script src="testimonials.js"></script>
     <script src="lead-form.js"></script>
-    <script src="reviews-toggle.js"></script>
     <!-- Taggbox embed should load after the widget container exists -->
     <script src="https://widget.taggbox.com/embed.min.js" type="text/javascript"></script>
   </body>
