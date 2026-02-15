@@ -80,11 +80,21 @@ async function handleLead(request, env, ctx) {
 
   const firstName = normalize(body.firstName);
   const lastName = normalize(body.lastName);
-  const phone = normalize(body.phone);
-  const email = normalize(body.email);
+  let phone = normalize(body.phone);
+  let email = normalize(body.email);
   const company = normalize(body.company); // honeypot
   const page = normalize(body.page);
   const ts = normalize(body.ts);
+
+  // Users often paste email into the phone field (or vice-versa). Be forgiving.
+  if (!email && phone && isEmail(phone)) {
+    email = phone;
+    phone = "";
+  }
+  if (!phone && email && !isEmail(email) && isPhoneLike(email)) {
+    phone = email;
+    email = "";
+  }
 
   if (company) {
     // Spam: pretend success.
@@ -155,4 +165,3 @@ export default {
     return new Response("Assets binding not configured", { status: 500 });
   },
 };
-
