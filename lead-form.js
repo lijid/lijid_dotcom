@@ -116,6 +116,8 @@
           else if (code === "missing_contact") msg = "Please enter a phone number or an email address.";
           else if (code === "server_not_configured")
             msg = "The contact form is not configured yet. Please call (612) 800-3202.";
+          else if (code === "mail_send_failed")
+            msg = "Email delivery failed. Please call (612) 800-3202 while we fix this.";
         } catch {
           // ignore JSON parse errors
         }

@@ -132,9 +132,20 @@ async function handleLead(request, env, ctx) {
     `<p><strong>Page:</strong> ${page ? `<a href="${escapeAttr(page)}">${escapeHtml(page)}</a>` : "-"}</p>` +
     `<p><strong>Time:</strong> ${escapeHtml(ts || "-")}</p>`;
 
-  ctx.waitUntil(sendMail({ toEmail, fromEmail, subject, text, html }));
-
-  return jsonResponse({ ok: true }, { headers: corsHeaders(request) });
+  try {
+    await sendMail({ toEmail, fromEmail, subject, text, html });
+    return jsonResponse({ ok: true }, { headers: corsHeaders(request) });
+  } catch (err) {
+    // Surface delivery failure to the client instead of reporting false success.
+    return jsonResponse(
+      {
+        ok: false,
+        error: "mail_send_failed",
+        message: String(err && err.message ? err.message : "mail send failed"),
+      },
+      { status: 502, headers: corsHeaders(request) }
+    );
+  }
 }
 
 function escapeHtml(s) {
