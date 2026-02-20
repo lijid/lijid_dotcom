@@ -31,7 +31,11 @@ function isPhoneLike(s) {
   return digits.length >= 7;
 }
 
-async function sendMail({ toEmail, fromEmail, subject, text, html }) {
+async function sendMail({ apiKey, toEmail, fromEmail, subject, text, html }) {
+  if (!apiKey) {
+    throw new Error("missing_mailchannels_api_key");
+  }
+
   const payload = {
     personalizations: [{ to: [{ email: toEmail }] }],
     from: { email: fromEmail, name: "LijiDeepak.com" },
@@ -44,7 +48,10 @@ async function sendMail({ toEmail, fromEmail, subject, text, html }) {
 
   const res = await fetch("https://api.mailchannels.net/tx/v1/send", {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+    },
     body: JSON.stringify(payload),
   });
 
@@ -64,7 +71,8 @@ async function handleLead(request, env, ctx) {
 
   const toEmail = normalize(env.LEAD_TO_EMAIL);
   const fromEmail = normalize(env.LEAD_FROM_EMAIL);
-  if (!toEmail || !fromEmail) {
+  const mailchannelsApiKey = normalize(env.MAILCHANNELS_API_KEY);
+  if (!toEmail || !fromEmail || !mailchannelsApiKey) {
     return jsonResponse(
       { ok: false, error: "server_not_configured" },
       { status: 500, headers: corsHeaders(request) }
@@ -133,7 +141,7 @@ async function handleLead(request, env, ctx) {
     `<p><strong>Time:</strong> ${escapeHtml(ts || "-")}</p>`;
 
   try {
-    await sendMail({ toEmail, fromEmail, subject, text, html });
+    await sendMail({ apiKey: mailchannelsApiKey, toEmail, fromEmail, subject, text, html });
     return jsonResponse({ ok: true }, { headers: corsHeaders(request) });
   } catch (err) {
     // Surface delivery failure to the client instead of reporting false success.
