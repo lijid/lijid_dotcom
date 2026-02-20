@@ -1,5 +1,5 @@
 window.SITE_CONFIG = {
-  siteVersion: "26.3.0",
+  siteVersion: "26.3.2",
   // Public Turnstile site key from Cloudflare (safe to expose in browser).
   turnstileSiteKey: "",
   // Stable “open reviews” link (derived from your Google Maps CID).
