@@ -4,6 +4,7 @@
   "main": "worker.js",
   "vars": {
     "LEAD_TO_EMAIL": "er.liji@gmail.com",
+    "LEAD_TO_EMAIL_2": "deepakcn79@outlook.com",
     "LEAD_FROM_EMAIL": "no-reply@lijideepak.com"
   },
   "assets": {
