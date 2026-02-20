@@ -45,6 +45,12 @@ In your Cloudflare Worker/Pages settings, set environment variables:
 - `LEAD_TO_EMAIL`: where you want leads delivered (example: `er.liji@gmail.com`)
 - `LEAD_FROM_EMAIL`: the sender address used by MailChannels (recommended: `no-reply@lijideepak.com`)
 - `MAILCHANNELS_API_KEY` (Secret): API key used to authorize `api.mailchannels.net`
+- `TURNSTILE_SECRET_KEY` (Secret): Cloudflare Turnstile secret key
+- `LEAD_RATE_LIMIT_MAX` (optional): max submissions per IP per window (default `5`)
+- `LEAD_RATE_LIMIT_WINDOW_MS` (optional): rate-limit window in ms (default `600000`)
+
+Frontend config (`site-config.js`):
+- `turnstileSiteKey`: Cloudflare Turnstile site key (public)
 
 Notes:
 - This uses MailChannels (`https://api.mailchannels.net/tx/v1/send`) from inside the Worker.

@@ -31,6 +31,40 @@ function isPhoneLike(s) {
   return digits.length >= 7;
 }
 
+const ipRateLimit = new Map();
+
+function isRateLimited(ip, limit, windowMs) {
+  if (!ip) return false;
+  const now = Date.now();
+  const rec = ipRateLimit.get(ip);
+  if (!rec) {
+    ipRateLimit.set(ip, [now]);
+    return false;
+  }
+
+  const fresh = rec.filter((ts) => now - ts < windowMs);
+  fresh.push(now);
+  ipRateLimit.set(ip, fresh);
+  return fresh.length > limit;
+}
+
+async function verifyTurnstile({ secretKey, token, ip }) {
+  if (!secretKey || !token) return false;
+  const form = new URLSearchParams();
+  form.set("secret", secretKey);
+  form.set("response", token);
+  if (ip) form.set("remoteip", ip);
+
+  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: form,
+  });
+  if (!res.ok) return false;
+  const data = await res.json().catch(() => null);
+  return Boolean(data && data.success);
+}
+
 async function sendMail({ apiKey, toEmail, fromEmail, subject, text, html }) {
   if (!apiKey) {
     throw new Error("missing_mailchannels_api_key");
@@ -77,7 +111,8 @@ async function handleLead(request, env, ctx) {
   const toEmail = normalize(env.LEAD_TO_EMAIL);
   const fromEmail = normalize(env.LEAD_FROM_EMAIL);
   const mailchannelsApiKey = normalize(env.MAILCHANNELS_API_KEY);
-  if (!toEmail || !fromEmail || !mailchannelsApiKey) {
+  const turnstileSecretKey = normalize(env.TURNSTILE_SECRET_KEY);
+  if (!toEmail || !fromEmail || !mailchannelsApiKey || !turnstileSecretKey) {
     return jsonResponse(
       { ok: false, error: "server_not_configured" },
       { status: 500, headers: corsHeaders(request) }
@@ -98,6 +133,19 @@ async function handleLead(request, env, ctx) {
   const company = normalize(body.company); // honeypot
   const page = normalize(body.page);
   const ts = normalize(body.ts);
+  const turnstileToken = normalize(body.turnstileToken);
+  const ip = normalize(request.headers.get("cf-connecting-ip"));
+  const maxPerWindow = Number(env.LEAD_RATE_LIMIT_MAX || 5);
+  const windowMs = Number(env.LEAD_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000);
+
+  if (isRateLimited(ip, maxPerWindow, windowMs)) {
+    return jsonResponse({ ok: false, error: "rate_limited" }, { status: 429, headers: corsHeaders(request) });
+  }
+
+  const captchaOk = await verifyTurnstile({ secretKey: turnstileSecretKey, token: turnstileToken, ip });
+  if (!captchaOk) {
+    return jsonResponse({ ok: false, error: "captcha_failed" }, { status: 400, headers: corsHeaders(request) });
+  }
 
   // Users often paste email into the phone field (or vice-versa). Be forgiving.
   if (!email && phone && isEmail(phone)) {

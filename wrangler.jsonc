@@ -4,7 +4,9 @@
   "main": "worker.js",
   "vars": {
     "LEAD_TO_EMAIL": "er.liji@gmail.com",
-    "LEAD_FROM_EMAIL": "no-reply@lijideepak.com"
+    "LEAD_FROM_EMAIL": "no-reply@lijideepak.com",
+    "LEAD_RATE_LIMIT_MAX": "5",
+    "LEAD_RATE_LIMIT_WINDOW_MS": "600000"
   },
   "assets": {
     "directory": ".",

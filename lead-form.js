@@ -4,10 +4,14 @@
   const form = document.getElementById("lead-form");
   const statusEl = document.getElementById("lead-status");
   const submitBtn = document.getElementById("lead-submit");
+  const turnstileHost = document.getElementById("turnstile-widget");
+  const turnstileSiteKey = String((window.SITE_CONFIG && window.SITE_CONFIG.turnstileSiteKey) || "").trim();
 
   if (!openBtn || !modal || !form || !statusEl || !submitBtn) return;
 
   let lastFocus = null;
+  let turnstileWidgetId = null;
+  let turnstileLoadPromise = null;
 
   function setOpen(open) {
     modal.classList.toggle("is-open", open);
@@ -46,10 +50,48 @@
     return "";
   }
 
+  function ensureTurnstileScript() {
+    if (window.turnstile) return Promise.resolve();
+    if (turnstileLoadPromise) return turnstileLoadPromise;
+    turnstileLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector("script[data-turnstile='1']");
+      if (existing) {
+        existing.addEventListener("load", () => resolve(), { once: true });
+        existing.addEventListener("error", () => reject(new Error("Failed to load Turnstile")), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.setAttribute("data-turnstile", "1");
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error("Failed to load Turnstile"));
+      document.head.appendChild(script);
+    });
+    return turnstileLoadPromise;
+  }
+
+  async function ensureTurnstileRendered() {
+    if (!turnstileSiteKey || !turnstileHost) return;
+    await ensureTurnstileScript();
+    if (turnstileWidgetId !== null) return;
+    turnstileWidgetId = window.turnstile.render(turnstileHost, {
+      sitekey: turnstileSiteKey,
+      theme: "light",
+    });
+  }
+
   openBtn.addEventListener("click", () => {
     setStatus("");
     form.reset();
+    if (turnstileWidgetId !== null && window.turnstile) {
+      window.turnstile.reset(turnstileWidgetId);
+    }
     setOpen(true);
+    ensureTurnstileRendered().catch(() => {
+      setStatus("Captcha failed to load. Please refresh and try again.");
+    });
   });
 
   modal.addEventListener("click", (e) => {
@@ -78,6 +120,8 @@
       company: sanitize(fd.get("company")), // honeypot
       page: window.location.href,
       ts: new Date().toISOString(),
+      turnstileToken:
+        turnstileWidgetId !== null && window.turnstile ? window.turnstile.getResponse(turnstileWidgetId) : "",
     };
 
     // Be forgiving if the user puts email in the phone field or vice versa.
@@ -93,6 +137,11 @@
     const err = validate(payload);
     if (err) {
       setStatus(err);
+      return;
+    }
+
+    if (turnstileSiteKey && !payload.turnstileToken) {
+      setStatus("Please complete the captcha.");
       return;
     }
 
@@ -118,6 +167,8 @@
             msg = "The contact form is not configured yet. Please call (612) 800-3202.";
           else if (code === "mail_send_failed")
             msg = "Email delivery failed. Please call (612) 800-3202 while we fix this.";
+          else if (code === "captcha_failed") msg = "Captcha verification failed. Please try again.";
+          else if (code === "rate_limited") msg = "Too many requests. Please wait a few minutes and try again.";
         } catch {
           // ignore JSON parse errors
         }
@@ -126,6 +177,9 @@
 
       setStatus("Thanks! I’ll reach out soon.");
       form.reset();
+      if (turnstileWidgetId !== null && window.turnstile) {
+        window.turnstile.reset(turnstileWidgetId);
+      }
       setTimeout(() => setOpen(false), 800);
     } catch (ex) {
       setStatus(ex && ex.message ? String(ex.message) : "Sorry, something went wrong. Please call (612) 800-3202.");
