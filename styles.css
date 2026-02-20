@@ -185,10 +185,38 @@ h2 {
   line-height: 1.5;
 }
 
+.card h3 {
+  margin: 0 0 0.6rem;
+  font-family: "Playfair Display", serif;
+  font-size: 1.2rem;
+}
+
 .author {
   margin: 0;
   color: var(--muted);
   font-weight: 700;
+}
+
+.page-hero {
+  min-height: auto;
+  padding-bottom: 2.5rem;
+}
+
+.breadcrumbs {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.seo-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #2b3242;
+  line-height: 1.55;
+}
+
+.seo-list li + li {
+  margin-top: 0.45rem;
 }
 
 .review-link {
