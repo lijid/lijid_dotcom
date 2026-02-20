@@ -43,7 +43,6 @@ The “Get In Touch” button opens a form. Submissions POST to `POST /api/lead`
 
 In your Cloudflare Worker/Pages settings, set environment variables:
 - `LEAD_TO_EMAIL`: where you want leads delivered (example: `er.liji@gmail.com`)
-- `LEAD_TO_EMAIL_2` (optional): backup recipient for lead emails
 - `LEAD_FROM_EMAIL`: the sender address used by MailChannels (recommended: `no-reply@lijideepak.com`)
 - `MAILCHANNELS_API_KEY` (Secret): API key used to authorize `api.mailchannels.net`
 

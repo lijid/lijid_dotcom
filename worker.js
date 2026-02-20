@@ -31,21 +31,18 @@ function isPhoneLike(s) {
   return digits.length >= 7;
 }
 
-async function sendMail({ apiKey, toEmails, fromEmail, subject, text, html }) {
+async function sendMail({ apiKey, toEmail, fromEmail, subject, text, html }) {
   if (!apiKey) {
     throw new Error("missing_mailchannels_api_key");
   }
 
-  const to = (Array.isArray(toEmails) ? toEmails : [])
-    .map((e) => normalize(e))
-    .filter((e) => e && isEmail(e))
-    .map((email) => ({ email }));
-  if (!to.length) {
+  const to = normalize(toEmail);
+  if (!to || !isEmail(to)) {
     throw new Error("missing_valid_to_email");
   }
 
   const payload = {
-    personalizations: [{ to }],
+    personalizations: [{ to: [{ email: to }] }],
     from: { email: fromEmail, name: "LijiDeepak.com" },
     subject,
     content: [
@@ -78,7 +75,6 @@ async function handleLead(request, env, ctx) {
   }
 
   const toEmail = normalize(env.LEAD_TO_EMAIL);
-  const toEmail2 = normalize(env.LEAD_TO_EMAIL_2);
   const fromEmail = normalize(env.LEAD_FROM_EMAIL);
   const mailchannelsApiKey = normalize(env.MAILCHANNELS_API_KEY);
   if (!toEmail || !fromEmail || !mailchannelsApiKey) {
@@ -152,7 +148,7 @@ async function handleLead(request, env, ctx) {
   try {
     await sendMail({
       apiKey: mailchannelsApiKey,
-      toEmails: [toEmail, toEmail2],
+      toEmail,
       fromEmail,
       subject,
       text,
