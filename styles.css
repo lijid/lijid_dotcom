@@ -159,7 +159,7 @@ h2 {
 }
 
 .reviews-embed {
-  min-height: 520px;
+  min-height: 380px;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid var(--line);
   border-radius: 16px;
@@ -170,7 +170,8 @@ h2 {
 .reviews-embed iframe {
   display: block;
   width: 100%;
-  min-height: 500px;
+  min-height: 360px;
+  height: 420px;
   border: 0;
   border-radius: 12px;
 }
@@ -294,6 +295,15 @@ h2 {
 
   .hero-photo {
     justify-content: flex-start;
+  }
+
+  .reviews-embed {
+    min-height: 320px;
+  }
+
+  .reviews-embed iframe {
+    min-height: 300px;
+    height: 340px;
   }
 }
 
