@@ -158,12 +158,21 @@ h2 {
   margin-top: 0;
 }
 
-.taggbox {
+.reviews-embed {
   min-height: 520px;
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: 0.5rem;
+  overflow: hidden;
+}
+
+.reviews-embed iframe {
+  display: block;
+  width: 100%;
+  min-height: 500px;
+  border: 0;
+  border-radius: 12px;
 }
 
 .cards {
