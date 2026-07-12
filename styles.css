@@ -160,10 +160,11 @@ h2 {
 
 .reviews-embed {
   min-height: 380px;
-  background: rgba(255, 255, 255, 0.4);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 0.5rem;
+  background: #fff;
+  border: 0;
+  border-radius: 20px;
+  padding: 0;
+  box-shadow: 0 10px 30px rgba(27, 31, 42, 0.08);
   overflow: hidden;
 }
 
@@ -173,7 +174,7 @@ h2 {
   min-height: 360px;
   height: 420px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 20px;
 }
 
 .cards {
